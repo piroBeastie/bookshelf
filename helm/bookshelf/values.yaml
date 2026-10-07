@@ -26,7 +26,11 @@ postgres:
 ingress:
   enabled: true
   className: nginx
-  host: bookshelf.local
+  # bookshelf.local is the real hostname; localhost is also listed so the app
+  # can be opened in a browser through a port-forward without a hosts entry
+  hosts:
+    - bookshelf.local
+    - localhost
 
 hpa:
   enabled: true

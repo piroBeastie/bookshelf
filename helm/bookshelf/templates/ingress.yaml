@@ -8,7 +8,8 @@ metadata:
 spec:
   ingressClassName: {{ .Values.ingress.className }}
   rules:
-    - host: {{ .Values.ingress.host }}
+    {{- range .Values.ingress.hosts }}
+    - host: {{ . | quote }}
       http:
         paths:
           # /api goes to the fastapi backend
@@ -16,15 +17,16 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: {{ include "bookshelf.name" . }}-backend
+                name: {{ include "bookshelf.name" $ }}-backend
                 port:
-                  number: {{ .Values.backend.port }}
+                  number: {{ $.Values.backend.port }}
           # everything else is the react bundle served by nginx
           - path: /
             pathType: Prefix
             backend:
               service:
-                name: {{ include "bookshelf.name" . }}-frontend
+                name: {{ include "bookshelf.name" $ }}-frontend
                 port:
                   number: 80
+    {{- end }}
 {{- end }}

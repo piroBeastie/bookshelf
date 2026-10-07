@@ -19,6 +19,19 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      # the api runs alembic on startup, so it must not start before postgres
+      # is accepting connections - otherwise the pod crashloops for a minute
+      initContainers:
+        - name: wait-for-postgres
+          image: {{ .Values.postgres.image }}
+          command:
+            - sh
+            - -c
+            - |
+              until pg_isready -h {{ include "bookshelf.name" . }}-postgres -p 5432 -U {{ .Values.postgres.username }}; do
+                echo "waiting for postgres..."
+                sleep 2
+              done
       containers:
         - name: backend
           image: "{{ .Values.backend.image }}:{{ .Values.backend.tag }}"
