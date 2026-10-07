@@ -1,0 +1,30 @@
+{{- if .Values.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "bookshelf.name" . }}
+  labels:
+    {{- include "bookshelf.labels" . | nindent 4 }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  rules:
+    - host: {{ .Values.ingress.host }}
+      http:
+        paths:
+          # /api goes to the fastapi backend
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "bookshelf.name" . }}-backend
+                port:
+                  number: {{ .Values.backend.port }}
+          # everything else is the react bundle served by nginx
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "bookshelf.name" . }}-frontend
+                port:
+                  number: 80
+{{- end }}

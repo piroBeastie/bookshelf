@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "bookshelf.name" . }}-frontend
+  labels:
+    {{- include "bookshelf.labels" . | nindent 4 }}
+    app: {{ include "bookshelf.name" . }}-frontend
+spec:
+  type: ClusterIP
+  selector:
+    app: {{ include "bookshelf.name" . }}-frontend
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
