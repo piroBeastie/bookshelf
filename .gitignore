@@ -1,0 +1,20 @@
+# python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+backend/test.db
+
+# secrets
+.env
+*.tfvars
+!*.tfvars.example
+
+# node
+node_modules/
+dist/
+
+# terraform
+.terraform/
+*.tfstate
+*.tfstate.*
