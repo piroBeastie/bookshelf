@@ -1,0 +1,29 @@
+# values for the grafana/grafana chart
+adminUser: admin
+adminPassword: admin
+
+persistence:
+  enabled: false
+
+service:
+  type: ClusterIP
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    cpu: 300m
+    memory: 256Mi
+
+# the prometheus data source is provisioned from this file instead of being
+# clicked together in the UI
+datasources:
+  datasources.yaml:
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        type: prometheus
+        access: proxy
+        url: http://prometheus-server.monitoring.svc.cluster.local
+        isDefault: true

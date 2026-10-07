@@ -1,0 +1,40 @@
+# values for the prometheus-community/prometheus chart
+# the extras are turned off to keep the footprint small on a single node cluster
+alertmanager:
+  enabled: false
+prometheus-pushgateway:
+  enabled: false
+prometheus-node-exporter:
+  enabled: false
+kube-state-metrics:
+  enabled: false
+
+server:
+  persistentVolume:
+    enabled: false
+  global:
+    scrape_interval: 15s
+  resources:
+    requests:
+      cpu: 50m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+# scrape every backend pod individually instead of going through the Service,
+# so each replica shows up as its own target
+extraScrapeConfigs: |
+  - job_name: bookshelf-backend
+    metrics_path: /metrics
+    kubernetes_sd_configs:
+      - role: endpoints
+        namespaces:
+          names:
+            - bookshelf
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_service_name, __meta_kubernetes_endpoint_port_name]
+        action: keep
+        regex: bookshelf-backend;http
+      - source_labels: [__meta_kubernetes_pod_name]
+        target_label: pod
