@@ -159,6 +159,108 @@ the Service `targetPort` is 8080.
 
 ---
 
+## M5 - CI/CD: GitHub Actions Pipeline
+
+[`.github/workflows/capstone-ci-cd.yml`](../.github/workflows/capstone-ci-cd.yml) runs on every push to
+`main` that touches `session21-capstone/**`.
+
+```
+test (flake8, pytest, npm build, artifact) ─┐
+                                            ├─► build-scan-push (docker build ×2 → trivy ×4 → ghcr push)
+chart (helm lint, helm template) ───────────┘
+```
+
+![green pipeline](screenshots/Screenshot%202026-10-07%20203241.png)
+
+**Status: Success, 2m 16s, 1 artifact.** the two quality jobs run in parallel and `build-scan-push` has
+`needs: [test, chart]`, so an image is never built from code whose tests failed.
+
+![pipeline steps](screenshots/Screenshot%202026-10-07%20203512.png)
+
+every step of the build job green: image names → GHCR login → build backend → build frontend → two Trivy
+reports → two security gates → push.
+
+### images in GHCR, tagged with the commit SHA
+
+![ghcr package](screenshots/Screenshot%202026-10-07%20203358.png)
+
+```
+docker pull ghcr.io/pirobeastie/bookshelf-backend:dfa3a16dffbc9917578c07c925c5f3f880345935
+```
+
+both packages are published and public. the tag is the **full commit sha**, never `latest`. that is the
+whole point: given a running pod you can read its image tag and go straight to the commit that produced
+it. `latest` tells you nothing and silently changes under you.
+
+### two bugs i had to fix to get here
+
+the first run failed in 3 seconds with:
+
+```
+Unable to resolve action `aquasecurity/trivy-action@0.28.0`, unable to find version `0.28.0`
+```
+
+that action tags its releases `v0.28.0`, **with the v**, and i had written it without. the job died in
+"Set up job", before running a single command - actions are resolved up front.
+
+the second run got further and failed on `docker build`: my image name was
+`ghcr.io/${{ github.repository_owner }}/bookshelf-backend`, and my github username is `piroBeastie`.
+**docker repository names must be lowercase.** so the workflow now lowercases the owner first:
+
+```yaml
+- name: Work out the image names
+  run: |
+    OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+    echo "BACKEND_IMAGE=${REGISTRY}/${OWNER}/bookshelf-backend" >> $GITHUB_ENV
+```
+
+both failures are the sort of thing you only find by actually running the pipeline. running the tests,
+the lint and the Trivy scan locally first caught everything else, but not these.
+
+---
+
+## M6 - DevSecOps: Trivy Security Scan
+
+Trivy runs **four times** in the pipeline - a report and a gate for each image:
+
+| step | flags | purpose |
+|---|---|---|
+| Trivy report - backend / frontend | `severity: HIGH,CRITICAL`, `exit-code: 0` | print everything, never block |
+| Security gate - backend / frontend | `+ ignore-unfixed: true`, `exit-code: 1` | **fail the build** |
+
+the same scan locally, which is how i checked before pushing:
+
+![trivy gate](screenshots/Screenshot%202026-10-07%20201012.png)
+
+```
+bookshelf-backend:dev    python-pkg  0     gate exit code = 0
+bookshelf-frontend:dev   alpine      0     gate exit code = 0
+```
+
+### the gate actually caught something
+
+the first time i ran it, **both images failed**:
+
+```
+starlette (METADATA)  CVE-2025-62727  HIGH  fixed  0.41.3  →  0.49.1   DoS via Range header merging
+starlette (METADATA)  CVE-2026-48818  HIGH  fixed  0.41.3  →  1.1.0    SSRF via UNC paths in StaticFiles
+starlette (METADATA)  CVE-2026-54283  HIGH  fixed  0.41.3  →  1.3.1    form() limits silently ignored
+libxml2 / musl / nghttp2 / zlib  (6 more HIGH in the frontend's alpine base)
+```
+
+the starlette ones are the interesting half: **i never installed starlette.** FastAPI 0.115.6 pulls it
+in, so a transitive dependency three levels down was the thing holding up the build. the fix was to move
+FastAPI to 0.142.2, which brings starlette 1.7.0 - above every listed fix version. The frontend's six
+were all OS packages in the nginx base image, fixed by moving from `1.27-alpine` (Alpine 3.21) to
+`1.31-alpine` (Alpine 3.24.2). after both changes the images scan clean and the 11 tests still pass.
+
+**why `ignore-unfixed` on the gate.** a strict gate fails on CVEs that have no patch published yet,
+which means nobody can ship until some upstream maintainer cuts a release - so people disable the gate.
+`--ignore-unfixed` only fails on things i can actually act on. the report step still prints everything,
+so unfixed CVEs stay visible, they just do not stop the build.
+
+---
+
 ## M7 - Terraform: AWS Infrastructure as Code
 
 > **honest note:** i do not have an AWS account with billing enabled, so i did **not** run
@@ -356,6 +458,52 @@ sum by (handler) (rate(http_requests_total{job="bookshelf-backend"}[5m]))
 one line per endpoint. the climb is `scripts/load-test.sh` sending 360 requests through the ingress.
 the grafana data source is provisioned from `monitoring/grafana-values.yaml`, so it is code, not
 something i clicked together and would have to redo after a restart.
+
+---
+
+## M10 - Documentation + the live demo
+
+[`README.md`](README.md) explains what BookShelf does, the stack, every endpoint, and how to run it
+locally, in kubernetes and in AWS.
+
+### the loop, end to end
+
+the demo is the thing the whole capstone is for: **a commit turns into running pods, without me building
+or copying anything.**
+
+1. i committed the workflow fix and pushed it
+2. GitHub Actions ran: tests → helm lint → docker build → Trivy gate → push to GHCR
+3. the images came out tagged `dfa3a16dffbc9917578c07c925c5f3f880345935`
+4. i pointed the Helm release at that tag
+
+```bash
+helm upgrade --install bookshelf ./helm/bookshelf -n bookshelf \
+  --set backend.image=ghcr.io/pirobeastie/bookshelf-backend  --set backend.tag=dfa3a16... \
+  --set frontend.image=ghcr.io/pirobeastie/bookshelf-frontend --set frontend.tag=dfa3a16...
+```
+
+![deployed from ghcr](screenshots/Screenshot%202026-10-07%20203130.png)
+
+```
+NAME                 IMAGE
+bookshelf-backend    ghcr.io/pirobeastie/bookshelf-backend:dfa3a16dffbc9917578c07c925c5f3f880345935
+bookshelf-frontend   ghcr.io/pirobeastie/bookshelf-frontend:dfa3a16dffbc9917578c07c925c5f3f880345935
+bookshelf-postgres   postgres:16-alpine
+```
+
+revision 5 of the release, a rolling update (old pods `Terminating` while the new ones are already
+`Running`, so the app never went down), and the api still answering through the ingress:
+
+```json
+{"total":6,"want":1,"reading":2,"finished":3,"pagesRead":1400,"averageRating":4.67}
+```
+
+the cluster is now running the exact bytes the pipeline built and the Trivy gate approved, and the tag
+on those pods points back at the commit. that is the full chain:
+
+```
+commit  →  actions  →  tests + helm lint  →  docker build  →  trivy gate  →  ghcr  →  helm  →  pods
+```
 
 ---
 
