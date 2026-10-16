@@ -1,0 +1,13 @@
+.git
+.github
+.gitignore
+README.md
+hw.md
+demo/
+screenshots/
+terraform/
+argocd/
+monitoring/
+helm/
+k8s/
+troubleshooting/

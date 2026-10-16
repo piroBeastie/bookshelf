@@ -45,3 +45,11 @@ resources:
   frontend:
     requests: {cpu: 10m, memory: 32Mi}
     limits: {cpu: 200m, memory: 128Mi}
+
+monitoring:
+  serviceMonitor:
+    # needs the prometheus operator CRDs; the plain prometheus chart used here
+    # discovers the pods itself, so this stays off
+    enabled: false
+    release: kube-prometheus-stack
+    interval: 15s

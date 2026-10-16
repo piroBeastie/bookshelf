@@ -1,0 +1,22 @@
+# Broken on purpose: the image tag does not exist, so the pod never starts.
+# Expect ImagePullBackOff, and the real reason in `kubectl describe pod`.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bookshelf-broken-image
+  namespace: bookshelf
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: broken-image
+  template:
+    metadata:
+      labels:
+        app: broken-image
+    spec:
+      containers:
+        - name: backend
+          image: ghcr.io/pirobeastie/bookshelf-backend:this-tag-does-not-exist
+          ports:
+            - containerPort: 8000

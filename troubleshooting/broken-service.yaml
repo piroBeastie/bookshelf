@@ -1,0 +1,14 @@
+# Broken on purpose: the selector matches no pod, so the Service has no
+# endpoints and every request to it times out. The Service itself looks healthy.
+apiVersion: v1
+kind: Service
+metadata:
+  name: broken-service
+  namespace: bookshelf
+spec:
+  type: ClusterIP
+  selector:
+    app: label-that-does-not-exist
+  ports:
+    - port: 8000
+      targetPort: 8000

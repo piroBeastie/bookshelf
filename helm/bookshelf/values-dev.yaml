@@ -1,0 +1,29 @@
+# helm upgrade --install bookshelf ./helm/bookshelf -n bookshelf -f helm/bookshelf/values-dev.yaml
+#
+# one replica of everything, no autoscaling - enough to develop against on a
+# single-node cluster without eating all of its memory.
+
+backend:
+  replicas: 1
+frontend:
+  replicas: 1
+
+imagePullPolicy: IfNotPresent
+
+ingress:
+  enabled: true
+  className: nginx
+  hosts:
+    - bookshelf.local
+    - localhost
+
+hpa:
+  enabled: false
+
+resources:
+  backend:
+    requests: {cpu: 25m, memory: 96Mi}
+    limits: {cpu: 500m, memory: 384Mi}
+  frontend:
+    requests: {cpu: 10m, memory: 24Mi}
+    limits: {cpu: 200m, memory: 128Mi}

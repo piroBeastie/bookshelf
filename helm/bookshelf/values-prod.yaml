@@ -1,0 +1,40 @@
+# helm upgrade --install bookshelf ./helm/bookshelf -n bookshelf -f helm/bookshelf/values-prod.yaml \
+#   --set backend.tag=<sha> --set frontend.tag=<sha> --set postgres.password=<from a secret manager>
+#
+# what would change on a real cluster: two of everything, autoscaling on, a real
+# hostname, and postgres handed over to a managed service.
+
+backend:
+  image: ghcr.io/pirobeastie/bookshelf-backend
+  replicas: 2
+frontend:
+  image: ghcr.io/pirobeastie/bookshelf-frontend
+  replicas: 2
+
+imagePullPolicy: IfNotPresent
+
+ingress:
+  enabled: true
+  className: nginx
+  hosts:
+    - bookshelf.example.com
+
+hpa:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 8
+  targetCPUUtilizationPercentage: 70
+
+# in-cluster postgres is a demo convenience; on a real cluster this is turned
+# off and DATABASE_URL points at RDS instead
+postgres:
+  enabled: true
+  storage: 20Gi
+
+resources:
+  backend:
+    requests: {cpu: 200m, memory: 256Mi}
+    limits: {cpu: 1000m, memory: 768Mi}
+  frontend:
+    requests: {cpu: 50m, memory: 64Mi}
+    limits: {cpu: 300m, memory: 192Mi}

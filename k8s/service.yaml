@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: bookshelf-backend
+  namespace: bookshelf
+  labels:
+    app: bookshelf-backend
+spec:
+  type: ClusterIP
+  selector:
+    app: bookshelf-backend
+  ports:
+    - name: http
+      protocol: TCP
+      port: 8000
+      targetPort: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: bookshelf-frontend
+  namespace: bookshelf
+  labels:
+    app: bookshelf-frontend
+spec:
+  type: ClusterIP
+  selector:
+    app: bookshelf-frontend
+  ports:
+    - name: http
+      protocol: TCP
+      port: 80
+      targetPort: http

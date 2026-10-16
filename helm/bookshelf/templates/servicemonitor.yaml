@@ -1,0 +1,24 @@
+{{- if .Values.monitoring.serviceMonitor.enabled }}
+# A ServiceMonitor is how you register a scrape target with the Prometheus
+# Operator (kube-prometheus-stack). It needs the operator's CRD to exist, so it
+# is OFF by default - this project installs the plain prometheus chart and finds
+# the pods with kubernetes_sd_configs instead (see monitoring/prometheus-values.yaml).
+#
+# Turn it on with --set monitoring.serviceMonitor.enabled=true on a cluster that
+# runs the operator.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "bookshelf.name" . }}-backend
+  labels:
+    {{- include "bookshelf.labels" . | nindent 4 }}
+    release: {{ .Values.monitoring.serviceMonitor.release }}
+spec:
+  selector:
+    matchLabels:
+      app: {{ include "bookshelf.name" . }}-backend
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: {{ .Values.monitoring.serviceMonitor.interval }}
+{{- end }}

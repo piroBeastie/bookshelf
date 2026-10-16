@@ -120,6 +120,27 @@ The chart creates postgres (with a PVC), the backend and frontend Deployments wi
 three ClusterIP Services, an HPA on the backend and an Ingress that routes `/api` to the backend and
 everything else to the frontend.
 
+Two environment overlays are included:
+
+```bash
+helm upgrade --install bookshelf ./helm/bookshelf -n bookshelf -f helm/bookshelf/values-dev.yaml
+helm upgrade --install bookshelf ./helm/bookshelf -n bookshelf -f helm/bookshelf/values-prod.yaml
+```
+
+`values-dev.yaml` is one replica of everything with autoscaling off; `values-prod.yaml` is two
+replicas, autoscaling on, a real hostname and a 20Gi volume. The chart also ships a ServiceMonitor
+template for clusters running the Prometheus Operator — off by default, because this project scrapes
+with plain Prometheus instead.
+
+If you would rather see it without any templating, `k8s/` holds the same thing as flat manifests:
+
+```bash
+kubectl apply -f k8s/        # namespace + both Deployments + both Services, SQLite, no postgres
+```
+
+And `troubleshooting/` has two manifests broken on purpose — an unpullable image and a Service whose
+selector matches nothing — with the commands that find each fault.
+
 ## GitOps with Argo CD
 
 ```bash
@@ -191,11 +212,12 @@ bookshelf/
 ├── backend/            fastapi app, alembic migrations, pytest suite, Dockerfile
 ├── frontend/           react app, nginx config, multi-stage Dockerfile
 ├── docker-compose.yml  the whole stack locally
-├── k8s/                namespace
+├── k8s/                namespace + flat manifests (the no-helm path)
 ├── helm/bookshelf/     the kubernetes package
 ├── terraform/          vpc + eks
 ├── monitoring/         prometheus and grafana helm values
 ├── argocd/             the Argo CD Application that watches this repo
+├── troubleshooting/    manifests broken on purpose, and how to diagnose them
 ├── scripts/            load generator
 ├── demo/               slide deck and the presentation video
 ├── screenshots/        evidence for every module
