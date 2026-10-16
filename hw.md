@@ -479,8 +479,18 @@ something i clicked together and would have to redo after a restart.
 
 ## M10 - Documentation + the live demo
 
-[`README.md`](README.md) explains what BookShelf does, the stack, every endpoint, and how to run it
-locally, in kubernetes and in AWS.
+[`README.md`](README.md) is the technical documentation: what BookShelf does, the architecture, the
+stack, every endpoint, how to run it locally, the CI/CD pipeline step by step, the GitOps setup, the
+Kubernetes and Helm deployment, the observability stack, the Terraform summary, and a
+**Known issues and limitations** section that says plainly what was not done and why.
+
+[`demo/`](demo) holds the presentation:
+
+| file | what it is |
+|---|---|
+| [`demo/slides.pptx`](demo/slides.pptx) | 10 slides - overview, stack, architecture, CI/CD, the security gate, infrastructure, Kubernetes, observability, learnings |
+| [`demo/VIDEO-SCRIPT.md`](demo/VIDEO-SCRIPT.md) | the recording script: pre-flight commands, section order, what to say, what to show |
+| `demo/presentation.mp4` | the recorded walkthrough |
 
 ### the loop, end to end
 

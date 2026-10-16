@@ -1,0 +1,52 @@
+# GitOps: Argo CD watches this repository and keeps the cluster matching it.
+#
+# Applied once by hand, and only this file:
+#   kubectl apply -f argocd/application.yaml
+#
+# After that nothing is deployed with kubectl or helm - a push to main is the
+# only way to change what runs. Argo CD renders helm/bookshelf itself, so this
+# release does not show up in `helm list`; the Helm release in the `bookshelf`
+# namespace is the one from module 8.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: bookshelf
+  namespace: argocd
+spec:
+  project: default
+
+  source:
+    repoURL: https://github.com/piroBeastie/bookshelf.git
+    targetRevision: main
+    path: helm/bookshelf
+    helm:
+      parameters:
+        - name: backend.image
+          value: ghcr.io/pirobeastie/bookshelf-backend
+        - name: backend.tag
+          value: c078d199cf979142e9ac63b1d68c46118f4f9460
+        - name: frontend.image
+          value: ghcr.io/pirobeastie/bookshelf-frontend
+        - name: frontend.tag
+          value: c078d199cf979142e9ac63b1d68c46118f4f9460
+        # one replica each: this runs beside the Helm release on a single-node
+        # cluster, and the point here is the GitOps loop, not the replica count
+        - name: backend.replicas
+          value: "1"
+        - name: frontend.replicas
+          value: "1"
+        - name: hpa.enabled
+          value: "false"
+        - name: ingress.enabled
+          value: "false"
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: bookshelf-gitops
+
+  syncPolicy:
+    automated:
+      prune: true      # delete resources removed from git
+      selfHeal: true   # undo changes made directly against the cluster
+    syncOptions:
+      - CreateNamespace=true
