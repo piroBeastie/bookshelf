@@ -173,29 +173,29 @@ test (flake8, pytest, npm build, artifact) ─┐
 chart (helm lint, helm template) ───────────┘
 ```
 
-![green pipeline](screenshots/Screenshot%202026-10-07%20203241.png)
+![green pipeline](screenshots/Screenshot%202026-10-16%20193012.png)
 
-**Status: Success, 2m 16s, 1 artifact.** the two quality jobs run in parallel and `build-scan-push` has
+**Status: Success, 1m 36s, 1 artifact.** the two quality jobs run in parallel and `build-scan-push` has
 `needs: [test, chart]`, so an image is never built from code whose tests failed.
 
-![pipeline steps](screenshots/Screenshot%202026-10-07%20203512.png)
+![pipeline steps](screenshots/Screenshot%202026-10-16%20193027.png)
 
 every step of the build job green: image names → GHCR login → build backend → build frontend → two Trivy
 reports → two security gates → push.
 
 ### images in GHCR, tagged with the commit SHA
 
-![ghcr package](screenshots/Screenshot%202026-10-07%20203358.png)
+![ghcr package](screenshots/Screenshot%202026-10-16%20193044.png)
 
 ```
-docker pull ghcr.io/pirobeastie/bookshelf-backend:dfa3a16dffbc9917578c07c925c5f3f880345935
+docker pull ghcr.io/pirobeastie/bookshelf-backend:c078d199cf979142e9ac63b1d68c46118f4f9460
 ```
 
 both packages are published and public. the tag is the **full commit sha**, never `latest`. that is the
 whole point: given a running pod you can read its image tag and go straight to the commit that produced
 it. `latest` tells you nothing and silently changes under you.
 
-### two bugs i had to fix to get here
+### three bugs i had to fix to get here
 
 the first run failed in 3 seconds with:
 
@@ -217,8 +217,21 @@ the second run got further and failed on `docker build`: my image name was
     echo "BACKEND_IMAGE=${REGISTRY}/${OWNER}/bookshelf-backend" >> $GITHUB_ENV
 ```
 
-both failures are the sort of thing you only find by actually running the pipeline. running the tests,
-the lint and the Trivy scan locally first caught everything else, but not these.
+the third one appeared only after i split this project out of my course repo into its own repository.
+everything built and both Trivy gates passed, then the last step died:
+
+```
+The push refers to repository [ghcr.io/pirobeastie/bookshelf-backend]
+denied: permission_denied: write_package
+```
+
+the package already existed and was **linked to the repository that first created it**, so the new
+repo's `GITHUB_TOKEN` had no write access to it. granting this repo Write under the package's
+"Manage Actions access" fixed it - no code change. a registry permission is attached to the package,
+not to the account.
+
+all three are the sort of thing you only find by actually running the pipeline. running the tests, the
+lint and the Trivy scan locally first caught everything else, but not these.
 
 ---
 
@@ -474,27 +487,27 @@ locally, in kubernetes and in AWS.
 the demo is the thing the whole capstone is for: **a commit turns into running pods, without me building
 or copying anything.**
 
-1. i committed the workflow fix and pushed it
+1. i committed and pushed
 2. GitHub Actions ran: tests → helm lint → docker build → Trivy gate → push to GHCR
-3. the images came out tagged `dfa3a16dffbc9917578c07c925c5f3f880345935`
+3. the images came out tagged `c078d199cf979142e9ac63b1d68c46118f4f9460`, the commit sha
 4. i pointed the Helm release at that tag
 
 ```bash
 helm upgrade --install bookshelf ./helm/bookshelf -n bookshelf \
-  --set backend.image=ghcr.io/pirobeastie/bookshelf-backend  --set backend.tag=dfa3a16... \
-  --set frontend.image=ghcr.io/pirobeastie/bookshelf-frontend --set frontend.tag=dfa3a16...
+  --set backend.image=ghcr.io/pirobeastie/bookshelf-backend  --set backend.tag=$SHA \
+  --set frontend.image=ghcr.io/pirobeastie/bookshelf-frontend --set frontend.tag=$SHA
 ```
 
-![deployed from ghcr](screenshots/Screenshot%202026-10-07%20203130.png)
+![deployed from ghcr](screenshots/Screenshot%202026-10-16%20200846.png)
 
 ```
 NAME                 IMAGE
-bookshelf-backend    ghcr.io/pirobeastie/bookshelf-backend:dfa3a16dffbc9917578c07c925c5f3f880345935
-bookshelf-frontend   ghcr.io/pirobeastie/bookshelf-frontend:dfa3a16dffbc9917578c07c925c5f3f880345935
+bookshelf-backend    ghcr.io/pirobeastie/bookshelf-backend:c078d199cf979142e9ac63b1d68c46118f4f9460
+bookshelf-frontend   ghcr.io/pirobeastie/bookshelf-frontend:c078d199cf979142e9ac63b1d68c46118f4f9460
 bookshelf-postgres   postgres:16-alpine
 ```
 
-revision 5 of the release, a rolling update (old pods `Terminating` while the new ones are already
+`STATUS: deployed`, a rolling update (old pods `Terminating` while the new ones are already
 `Running`, so the app never went down), and the api still answering through the ingress:
 
 ```json
