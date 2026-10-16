@@ -19,6 +19,20 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      # nginx resolves the backend Service name when it loads its config and
+      # exits if it cannot - so after a cluster restart, a frontend pod that
+      # starts before CoreDNS is ready crashloops. this waits for DNS first.
+      initContainers:
+        - name: wait-for-backend
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              until wget -q -T 3 -O /dev/null http://{{ include "bookshelf.name" . }}-backend:{{ .Values.backend.port }}/health; do
+                echo "waiting for the backend to answer..."
+                sleep 2
+              done
       containers:
         - name: frontend
           image: "{{ .Values.frontend.image }}:{{ .Values.frontend.tag }}"
