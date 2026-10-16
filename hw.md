@@ -3,7 +3,7 @@
 **Name:** Nanakjot Singh Chahal
 **Enrollment No:** 24bcs10132
 
-**Repo:** <https://github.com/piroBeastie/devops-heros> — project folder [`session21-capstone/`](.)
+**Repo:** <https://github.com/piroBeastie/bookshelf>
 
 My application is **BookShelf**, a reading list. You add books, move them between `WANT` → `READING` →
 `FINISHED`, rate them out of 5, and it keeps a running total of pages finished and the average rating.
@@ -12,6 +12,10 @@ The domain is mine; the DevOps layer follows the architecture taught in the cour
 > everything below was actually run on my machine - wsl2 ubuntu with docker, a minikube cluster, and
 > github actions for the pipeline. the one thing i could not do for real is `terraform apply`, because i
 > do not have an AWS account with billing - that is explained honestly in M7.
+>
+> i built this inside my course repo first and then split it out into this one, keeping all 14 commits,
+> so some terminal screenshots still show the old working directory and the image names docker compose
+> derived from it (`session21-capstone-backend`). the commands and the output are unchanged.
 
 ---
 
@@ -161,8 +165,7 @@ the Service `targetPort` is 8080.
 
 ## M5 - CI/CD: GitHub Actions Pipeline
 
-[`.github/workflows/capstone-ci-cd.yml`](../.github/workflows/capstone-ci-cd.yml) runs on every push to
-`main` that touches `session21-capstone/**`.
+[`.github/workflows/ci-cd.yml`](.github/workflows/ci-cd.yml) runs on every push to `main`.
 
 ```
 test (flake8, pytest, npm build, artifact) ─┐

@@ -122,7 +122,7 @@ No credentials live in this repository. Terraform reads them from the environmen
 ## Layout
 
 ```
-session21-capstone/
+bookshelf/
 ├── backend/            fastapi app, alembic migrations, pytest suite, Dockerfile
 ├── frontend/           react app, nginx config, multi-stage Dockerfile
 ├── docker-compose.yml  the whole stack locally
@@ -134,5 +134,4 @@ session21-capstone/
 └── hw.md               the writeup, with screenshots of every module
 ```
 
-The pipeline lives in [`.github/workflows/capstone-ci-cd.yml`](../.github/workflows/capstone-ci-cd.yml)
-at the root of the repository, because that is where GitHub looks for workflows.
+The pipeline lives in [`.github/workflows/ci-cd.yml`](.github/workflows/ci-cd.yml).

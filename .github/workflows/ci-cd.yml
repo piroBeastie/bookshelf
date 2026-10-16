@@ -1,0 +1,142 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  test:
+    name: Tests and frontend build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: |
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+
+      - name: Lint backend
+        working-directory: backend
+        run: flake8 app tests --max-line-length=110
+
+      - name: Run pytest
+        working-directory: backend
+        run: pytest -v
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Build frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+
+      - name: Upload frontend bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist
+
+  chart:
+    name: Helm chart
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+      - name: helm lint
+        run: helm lint helm/bookshelf
+      - name: helm template
+        run: helm template bookshelf helm/bookshelf > /dev/null
+
+  build-scan-push:
+    name: Build, scan and push images
+    needs: [ test, chart ]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      # a docker repository name has to be lowercase, and a github username
+      # does not have to be - so the owner is lowercased here
+      - name: Work out the image names
+        run: |
+          OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          echo "BACKEND_IMAGE=${REGISTRY}/${OWNER}/bookshelf-backend" >> $GITHUB_ENV
+          echo "FRONTEND_IMAGE=${REGISTRY}/${OWNER}/bookshelf-frontend" >> $GITHUB_ENV
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build backend image
+        run: docker build -t $BACKEND_IMAGE:${{ github.sha }} backend
+
+      - name: Build frontend image
+        run: docker build -t $FRONTEND_IMAGE:${{ github.sha }} frontend
+
+      # report everything first so the log shows what is in the images
+      - name: Trivy report - backend
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ${{ env.BACKEND_IMAGE }}:${{ github.sha }}
+          severity: 'HIGH,CRITICAL'
+          scanners: 'vuln'
+          exit-code: '0'
+
+      - name: Trivy report - frontend
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ${{ env.FRONTEND_IMAGE }}:${{ github.sha }}
+          severity: 'HIGH,CRITICAL'
+          scanners: 'vuln'
+          exit-code: '0'
+
+      # the gate: fail the build on HIGH/CRITICAL CVEs that have a fix available
+      - name: Security gate - backend
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ${{ env.BACKEND_IMAGE }}:${{ github.sha }}
+          severity: 'HIGH,CRITICAL'
+          scanners: 'vuln'
+          ignore-unfixed: true
+          exit-code: '1'
+
+      - name: Security gate - frontend
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ${{ env.FRONTEND_IMAGE }}:${{ github.sha }}
+          severity: 'HIGH,CRITICAL'
+          scanners: 'vuln'
+          ignore-unfixed: true
+          exit-code: '1'
+
+      # tagged with the commit sha, never :latest, so every deploy is traceable
+      - name: Push images
+        run: |
+          docker push $BACKEND_IMAGE:${{ github.sha }}
+          docker push $FRONTEND_IMAGE:${{ github.sha }}
+
+      - name: Summary
+        run: |
+          echo "### Images pushed" >> $GITHUB_STEP_SUMMARY
+          echo "- \`$BACKEND_IMAGE:${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- \`$FRONTEND_IMAGE:${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
