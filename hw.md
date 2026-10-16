@@ -488,9 +488,15 @@ Kubernetes and Helm deployment, the observability stack, the Terraform summary, 
 
 | file | what it is |
 |---|---|
+| [`demo/presentation.mp4`](demo/presentation.mp4) | the walkthrough - 6:12, 1920x1080, captions on screen, no narration |
 | [`demo/slides.pptx`](demo/slides.pptx) | 10 slides - overview, stack, architecture, CI/CD, the security gate, infrastructure, Kubernetes, observability, learnings |
-| [`demo/VIDEO-SCRIPT.md`](demo/VIDEO-SCRIPT.md) | the recording script: pre-flight commands, section order, what to say, what to show |
-| `demo/presentation.mp4` | the recorded walkthrough |
+| [`demo/VIDEO-SCRIPT.md`](demo/VIDEO-SCRIPT.md) | the running order and the commands that bring the stack up before recording |
+
+the terminal sections of the video are real screen recordings - the commands run live while it records.
+the browser sections are full-resolution screenshots of the same live systems, held long enough to read.
+it covers, in order: the app, the codebase, the tests, docker compose, the green pipeline, the Trivy
+gates, GHCR, `terraform plan`, the AWS limitation, kubernetes, Argo CD, self-healing, Prometheus and
+Grafana.
 
 ### the loop, end to end
 
