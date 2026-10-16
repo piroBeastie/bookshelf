@@ -533,6 +533,65 @@ commit  →  actions  →  tests + helm lint  →  docker build  →  trivy gate
 
 ---
 
+## Extra - GitOps with Argo CD
+
+Not one of the ten modules, but the submission guidelines ask for it in the walkthrough, and it is the
+honest end of the chain that M10 starts: a commit should become running pods without anyone typing
+`kubectl apply`.
+
+[`argocd/application.yaml`](argocd/application.yaml) is the only file applied by hand:
+
+```bash
+kubectl create namespace argocd
+kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+kubectl apply -f argocd/application.yaml
+```
+
+![argo cd](screenshots/Screenshot%202026-10-16%20211050.png)
+
+**Healthy, Synced to `main (1b85606)`** - and Argo CD names the commit author and message on the
+application itself. Everything under it (the Secret, the PVC, three Services, three Deployments and
+their pods) was created by Argo CD reading `helm/bookshelf` out of this repository. I never applied any
+of it.
+
+It deploys into `bookshelf-gitops` rather than replacing the Helm release in `bookshelf`. Argo CD
+templates the chart itself, so its copy does not appear in `helm list`, and keeping them apart means the
+module 8 evidence is still a genuine Helm deployment.
+
+### the loop, and self-healing
+
+```bash
+kubectl get applications -n argocd
+kubectl scale deployment bookshelf-backend -n bookshelf-gitops --replicas=3
+kubectl get deploy bookshelf-backend -n bookshelf-gitops     # 1/3
+# 25 seconds later
+kubectl get deploy bookshelf-backend -n bookshelf-gitops     # 1/1
+```
+
+![self heal](screenshots/Screenshot%202026-10-16%20205431.png)
+
+```
+Updated sync status: Synced -> OutOfSync
+Updated health status: Healthy -> Progressing
+Partial sync operation to 1b85606aad4ff5f03e999385772fdf8268df113e succeeded
+Updated sync status: OutOfSync -> Synced
+Updated health status: Progressing -> Healthy
+```
+
+I scaled the deployment to three. Git says one. Twenty-five seconds later it was back to one, and the
+event trail shows exactly why: the controller noticed the drift, started an automated sync and
+reconciled it.
+
+With `selfHeal: true`, **editing the cluster does nothing permanent**. If you want three replicas you
+change the file and push. That is the difference between a cluster someone has been poking at and a
+cluster you can actually reason about.
+
+The same mechanism handled a real change earlier in this session: I pushed the frontend initContainer
+fix, and Argo CD rolled the frontend in `bookshelf-gitops` on its own - the pod in the screenshot above
+is 82 seconds old because of that sync, not because I restarted anything.
+
+---
+
 ## Two problems i had to fix
 
 ### the ingress controller was dropping four requests out of five
